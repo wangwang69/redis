@@ -1,93 +1,86 @@
-start_server {tags {"aofrw external:skip"}} {
+start_server {tags {"aofrw"}} {
     # Enable the AOF
     r config set appendonly yes
     r config set auto-aof-rewrite-percentage 0 ; # Disable auto-rewrite.
     waitForBgrewriteaof r
 
-    foreach rdbpre {yes no} {
-        r config set aof-use-rdb-preamble $rdbpre
-        test "AOF rewrite during write load: RDB preamble=$rdbpre" {
-            # Start a write load for 10 seconds
-            set master [srv 0 client]
-            set master_host [srv 0 host]
-            set master_port [srv 0 port]
-            set load_handle0 [start_write_load $master_host $master_port 10]
-            set load_handle1 [start_write_load $master_host $master_port 10]
-            set load_handle2 [start_write_load $master_host $master_port 10]
-            set load_handle3 [start_write_load $master_host $master_port 10]
-            set load_handle4 [start_write_load $master_host $master_port 10]
+    test {AOF rewrite during write load} {
+        # Start a write load for 10 seconds
+        set master [srv 0 client]
+        set master_host [srv 0 host]
+        set master_port [srv 0 port]
+        set load_handle0 [start_write_load $master_host $master_port 10]
+        set load_handle1 [start_write_load $master_host $master_port 10]
+        set load_handle2 [start_write_load $master_host $master_port 10]
+        set load_handle3 [start_write_load $master_host $master_port 10]
+        set load_handle4 [start_write_load $master_host $master_port 10]
 
-            # Make sure the instance is really receiving data
-            wait_for_condition 50 100 {
-                [r dbsize] > 0
-            } else {
-                fail "No write load detected."
-            }
-
-            # After 3 seconds, start a rewrite, while the write load is still
-            # active.
-            after 3000
-            r bgrewriteaof
-            waitForBgrewriteaof r
-
-            # Let it run a bit more so that we'll append some data to the new
-            # AOF.
-            after 1000
-
-            # Stop the processes generating the load if they are still active
-            stop_write_load $load_handle0
-            stop_write_load $load_handle1
-            stop_write_load $load_handle2
-            stop_write_load $load_handle3
-            stop_write_load $load_handle4
-
-            # Make sure no more commands processed, before taking debug digest
-            wait_load_handlers_disconnected
-
-            # Get the data set digest
-            set d1 [debug_digest]
-
-            # Load the AOF
-            r debug loadaof
-            set d2 [debug_digest]
-
-            # Make sure they are the same
-            assert {$d1 eq $d2}
+        # Make sure the instance is really receiving data
+        wait_for_condition 50 100 {
+            [r dbsize] > 0
+        } else {
+            fail "No write load detected."
         }
+
+        # After 3 seconds, start a rewrite, while the write load is still
+        # active.
+        after 3000
+        r bgrewriteaof
+        waitForBgrewriteaof r
+
+        # Let it run a bit more so that we'll append some data to the new
+        # AOF.
+        after 1000
+
+        # Stop the processes generating the load if they are still active
+        stop_write_load $load_handle0
+        stop_write_load $load_handle1
+        stop_write_load $load_handle2
+        stop_write_load $load_handle3
+        stop_write_load $load_handle4
+
+        # Make sure that we remain the only connected client.
+        # This step is needed to make sure there are no pending writes
+        # that will be processed between the two "debug digest" calls.
+        wait_for_condition 50 100 {
+            [llength [split [string trim [r client list]] "\n"]] == 1
+        } else {
+            puts [r client list]
+            fail "Clients generating loads are not disconnecting"
+        }
+
+        # Get the data set digest
+        set d1 [r debug digest]
+
+        # Load the AOF
+        r debug loadaof
+        set d2 [r debug digest]
+
+        # Make sure they are the same
+        assert {$d1 eq $d2}
     }
 }
 
-start_server {tags {"aofrw external:skip"} overrides {aof-use-rdb-preamble no}} {
+start_server {tags {"aofrw"}} {
     test {Turning off AOF kills the background writing child if any} {
         r config set appendonly yes
         waitForBgrewriteaof r
-
-        # start a slow AOFRW
-        r set k v
-        r config set rdb-key-save-delay 10000000
+        r multi
         r bgrewriteaof
-
-        # disable AOF and wait for the child to be killed
         r config set appendonly no
+        r exec
         wait_for_condition 50 100 {
-            [string match {*Killing*AOF*child*} [exec tail -5 < [srv 0 stdout]]]
+            [string match {*Killing*AOF*child*} [exec tail -n5 < [srv 0 stdout]]]
         } else {
             fail "Can't find 'Killing AOF child' into recent logs"
         }
-        r config set rdb-key-save-delay 0
     }
 
     foreach d {string int} {
-        foreach e {listpack quicklist} {
+        foreach e {ziplist linkedlist} {
             test "AOF rewrite of list with $e encoding, $d data" {
                 r flushall
-                if {$e eq {listpack}} {
-                    r config set list-max-listpack-size -2
-                    set len 10
-                } else {
-                    r config set list-max-listpack-size 10
-                    set len 1000
-                }
+                if {$e eq {ziplist}} {set len 10} else {set len 1000}
                 for {set j 0} {$j < $len} {incr j} {
                     if {$d eq {string}} {
                         set data [randstring 0 16 alpha]
@@ -97,11 +90,11 @@ start_server {tags {"aofrw external:skip"} overrides {aof-use-rdb-preamble no}} 
                     r lpush key $data
                 }
                 assert_equal [r object encoding key] $e
-                set d1 [debug_digest]
+                set d1 [r debug digest]
                 r bgrewriteaof
                 waitForBgrewriteaof r
                 r debug loadaof
-                set d2 [debug_digest]
+                set d2 [r debug digest]
                 if {$d1 ne $d2} {
                     error "assertion:$d1 is not equal to $d2"
                 }
@@ -125,11 +118,11 @@ start_server {tags {"aofrw external:skip"} overrides {aof-use-rdb-preamble no}} 
                 if {$d ne {string}} {
                     assert_equal [r object encoding key] $e
                 }
-                set d1 [debug_digest]
+                set d1 [r debug digest]
                 r bgrewriteaof
                 waitForBgrewriteaof r
                 r debug loadaof
-                set d2 [debug_digest]
+                set d2 [r debug digest]
                 if {$d1 ne $d2} {
                     error "assertion:$d1 is not equal to $d2"
                 }
@@ -138,10 +131,10 @@ start_server {tags {"aofrw external:skip"} overrides {aof-use-rdb-preamble no}} 
     }
 
     foreach d {string int} {
-        foreach e {listpack hashtable} {
+        foreach e {ziplist hashtable} {
             test "AOF rewrite of hash with $e encoding, $d data" {
                 r flushall
-                if {$e eq {listpack}} {set len 10} else {set len 1000}
+                if {$e eq {ziplist}} {set len 10} else {set len 1000}
                 for {set j 0} {$j < $len} {incr j} {
                     if {$d eq {string}} {
                         set data [randstring 0 16 alpha]
@@ -151,11 +144,11 @@ start_server {tags {"aofrw external:skip"} overrides {aof-use-rdb-preamble no}} 
                     r hset key $data $data
                 }
                 assert_equal [r object encoding key] $e
-                set d1 [debug_digest]
+                set d1 [r debug digest]
                 r bgrewriteaof
                 waitForBgrewriteaof r
                 r debug loadaof
-                set d2 [debug_digest]
+                set d2 [r debug digest]
                 if {$d1 ne $d2} {
                     error "assertion:$d1 is not equal to $d2"
                 }
@@ -164,10 +157,10 @@ start_server {tags {"aofrw external:skip"} overrides {aof-use-rdb-preamble no}} 
     }
 
     foreach d {string int} {
-        foreach e {listpack skiplist} {
+        foreach e {ziplist skiplist} {
             test "AOF rewrite of zset with $e encoding, $d data" {
                 r flushall
-                if {$e eq {listpack}} {set len 10} else {set len 1000}
+                if {$e eq {ziplist}} {set len 10} else {set len 1000}
                 for {set j 0} {$j < $len} {incr j} {
                     if {$d eq {string}} {
                         set data [randstring 0 16 alpha]
@@ -177,11 +170,11 @@ start_server {tags {"aofrw external:skip"} overrides {aof-use-rdb-preamble no}} 
                     r zadd key [expr rand()] $data
                 }
                 assert_equal [r object encoding key] $e
-                set d1 [debug_digest]
+                set d1 [r debug digest]
                 r bgrewriteaof
                 waitForBgrewriteaof r
                 r debug loadaof
-                set d2 [debug_digest]
+                set d2 [r debug digest]
                 if {$d1 ne $d2} {
                     error "assertion:$d1 is not equal to $d2"
                 }
@@ -189,42 +182,29 @@ start_server {tags {"aofrw external:skip"} overrides {aof-use-rdb-preamble no}} 
         }
     }
 
-    test "AOF rewrite functions" {
-        r flushall
-        r FUNCTION LOAD {#!lua name=test
-            redis.register_function('test', function() return 1 end)
-        }
-        r bgrewriteaof
-        waitForBgrewriteaof r
-        r function flush
-        r debug loadaof
-        assert_equal [r fcall test 0] 1
-        r FUNCTION LIST
-    } {{library_name test engine LUA functions {{name test description {} flags {}}}}}
-
     test {BGREWRITEAOF is delayed if BGSAVE is in progress} {
-        r flushall
-        r set k v
-        r config set rdb-key-save-delay 10000000
+        r multi
         r bgsave
-        assert_match {*scheduled*} [r bgrewriteaof]
-        assert_equal [s aof_rewrite_scheduled] 1
-        r config set rdb-key-save-delay 0
-        catch {exec kill -9 [get_child_pid 0]}
-        while {[s aof_rewrite_scheduled] eq 1} {
+        r bgrewriteaof
+        r info persistence
+        set res [r exec]
+        assert_match {*scheduled*} [lindex $res 1]
+        assert_match {*aof_rewrite_scheduled:1*} [lindex $res 2]
+        while {[string match {*aof_rewrite_scheduled:1*} [r info persistence]]} {
             after 100
         }
     }
 
     test {BGREWRITEAOF is refused if already in progress} {
-        r config set aof-use-rdb-preamble yes
-        r config set rdb-key-save-delay 10000000
         catch {
+            r multi
             r bgrewriteaof
             r bgrewriteaof
+            r exec
         } e
         assert_match {*ERR*already*} $e
-        r config set rdb-key-save-delay 0
-        catch {exec kill -9 [get_child_pid 0]}
+        while {[string match {*aof_rewrite_scheduled:1*} [r info persistence]]} {
+            after 100
+        }
     }
 }

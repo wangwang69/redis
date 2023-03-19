@@ -1,4 +1,9 @@
-start_server {tags {"string"}} {
+start_server {tags {"basic"}} {
+    test {DEL all keys to start with a clean DB} {
+        foreach key [r keys *] {r del $key}
+        r dbsize
+    } {0}
+
     test {SET and GET an item} {
         r set x foobar
         r get x
@@ -8,6 +13,38 @@ start_server {tags {"string"}} {
         r set x {}
         r get x
     } {}
+
+    test {DEL against a single item} {
+        r del x
+        r get x
+    } {}
+
+    test {Vararg DEL} {
+        r set foo1 a
+        r set foo2 b
+        r set foo3 c
+        list [r del foo1 foo2 foo3 foo4] [r mget foo1 foo2 foo3]
+    } {3 {{} {} {}}}
+
+    test {KEYS with pattern} {
+        foreach key {key_x key_y key_z foo_a foo_b foo_c} {
+            r set $key hello
+        }
+        lsort [r keys foo*]
+    } {foo_a foo_b foo_c}
+
+    test {KEYS to get all keys} {
+        lsort [r keys *]
+    } {foo_a foo_b foo_c key_x key_y key_z}
+
+    test {DBSIZE} {
+        r dbsize
+    } {6}
+
+    test {DEL all keys} {
+        foreach key [r keys *] {r del $key}
+        r dbsize
+    } {0}
 
     test {Very big payload in GET/SET} {
         set buf [string repeat "abcd" 1000000]
@@ -38,7 +75,6 @@ start_server {tags {"string"}} {
         } {}
 
         test {SET 10000 numeric keys and access all them in reverse order} {
-            r flushdb
             set err {}
             for {set x 0} {$x < 10000} {incr x} {
                 r set $x $x
@@ -54,10 +90,156 @@ start_server {tags {"string"}} {
             set _ $err
         } {}
 
-        test {DBSIZE should be 10000 now} {
+        test {DBSIZE should be 10101 now} {
             r dbsize
-        } {10000}
+        } {10101}
     }
+
+    test {INCR against non existing key} {
+        set res {}
+        append res [r incr novar]
+        append res [r get novar]
+    } {11}
+
+    test {INCR against key created by incr itself} {
+        r incr novar
+    } {2}
+
+    test {INCR against key originally set with SET} {
+        r set novar 100
+        r incr novar
+    } {101}
+
+    test {INCR over 32bit value} {
+        r set novar 17179869184
+        r incr novar
+    } {17179869185}
+
+    test {INCRBY over 32bit value with over 32bit increment} {
+        r set novar 17179869184
+        r incrby novar 17179869184
+    } {34359738368}
+
+    test {INCR fails against key with spaces (left)} {
+        r set novar "    11"
+        catch {r incr novar} err
+        format $err
+    } {ERR*}
+
+    test {INCR fails against key with spaces (right)} {
+        r set novar "11    "
+        catch {r incr novar} err
+        format $err
+    } {ERR*}
+
+    test {INCR fails against key with spaces (both)} {
+        r set novar "    11    "
+        catch {r incr novar} err
+        format $err
+    } {ERR*}
+
+    test {INCR fails against a key holding a list} {
+        r rpush mylist 1
+        catch {r incr mylist} err
+        r rpop mylist
+        format $err
+    } {WRONGTYPE*}
+
+    test {DECRBY over 32bit value with over 32bit increment, negative res} {
+        r set novar 17179869184
+        r decrby novar 17179869185
+    } {-1}
+
+    test {INCR uses shared objects in the 0-9999 range} {
+        r set foo -1
+        r incr foo
+        assert {[r object refcount foo] > 1}
+        r set foo 9998
+        r incr foo
+        assert {[r object refcount foo] > 1}
+        r incr foo
+        assert {[r object refcount foo] == 1}
+    }
+
+    test {INCR can modify objects in-place} {
+        r set foo 20000
+        r incr foo
+        assert {[r object refcount foo] == 1}
+        set old [lindex [split [r debug object foo]] 1]
+        r incr foo
+        set new [lindex [split [r debug object foo]] 1]
+        assert {[string range $old 0 2] eq "at:"}
+        assert {[string range $new 0 2] eq "at:"}
+        assert {$old eq $new}
+    }
+
+    test {INCRBYFLOAT against non existing key} {
+        r del novar
+        list    [roundFloat [r incrbyfloat novar 1]] \
+                [roundFloat [r get novar]] \
+                [roundFloat [r incrbyfloat novar 0.25]] \
+                [roundFloat [r get novar]]
+    } {1 1 1.25 1.25}
+
+    test {INCRBYFLOAT against key originally set with SET} {
+        r set novar 1.5
+        roundFloat [r incrbyfloat novar 1.5]
+    } {3}
+
+    test {INCRBYFLOAT over 32bit value} {
+        r set novar 17179869184
+        r incrbyfloat novar 1.5
+    } {17179869185.5}
+
+    test {INCRBYFLOAT over 32bit value with over 32bit increment} {
+        r set novar 17179869184
+        r incrbyfloat novar 17179869184
+    } {34359738368}
+
+    test {INCRBYFLOAT fails against key with spaces (left)} {
+        set err {}
+        r set novar "    11"
+        catch {r incrbyfloat novar 1.0} err
+        format $err
+    } {ERR*valid*}
+
+    test {INCRBYFLOAT fails against key with spaces (right)} {
+        set err {}
+        r set novar "11    "
+        catch {r incrbyfloat novar 1.0} err
+        format $err
+    } {ERR*valid*}
+
+    test {INCRBYFLOAT fails against key with spaces (both)} {
+        set err {}
+        r set novar " 11 "
+        catch {r incrbyfloat novar 1.0} err
+        format $err
+    } {ERR*valid*}
+
+    test {INCRBYFLOAT fails against a key holding a list} {
+        r del mylist
+        set err {}
+        r rpush mylist 1
+        catch {r incrbyfloat mylist 1.0} err
+        r del mylist
+        format $err
+    } {WRONGTYPE*}
+
+    test {INCRBYFLOAT does not allow NaN or Infinity} {
+        r set foo 0
+        set err {}
+        catch {r incrbyfloat foo +inf} err
+        set err
+        # p.s. no way I can force NaN to test it from the API because
+        # there is no way to increment / decrement by infinity nor to
+        # perform divisions.
+    } {ERR*would produce*}
+
+    test {INCRBYFLOAT decrement} {
+        r set foo 1
+        roundFloat [r incrbyfloat foo -1.1]
+    } {-0.1}
 
     test "SETNX target key missing" {
         r del novar
@@ -102,112 +284,246 @@ start_server {tags {"string"}} {
         assert_equal 20 [r get x]
     }
 
-    test "GETEX EX option" {
-        r del foo
-        r set foo bar
-        r getex foo ex 10
-        assert_range [r ttl foo] 5 10
+    test "DEL against expired key" {
+        r debug set-active-expire 0
+        r setex keyExpire 1 valExpire
+        after 1100
+        assert_equal 0 [r del keyExpire]
+        r debug set-active-expire 1
     }
 
-    test "GETEX PX option" {
-        r del foo
-        r set foo bar
-        r getex foo px 10000
-        assert_range [r pttl foo] 5000 10000
+    test {EXISTS} {
+        set res {}
+        r set newkey test
+        append res [r exists newkey]
+        r del newkey
+        append res [r exists newkey]
+    } {10}
+
+    test {Zero length value in key. SET/GET/EXISTS} {
+        r set emptykey {}
+        set res [r get emptykey]
+        append res [r exists emptykey]
+        r del emptykey
+        append res [r exists emptykey]
+    } {10}
+
+    test {Commands pipelining} {
+        set fd [r channel]
+        puts -nonewline $fd "SET k1 xyzk\r\nGET k1\r\nPING\r\n"
+        flush $fd
+        set res {}
+        append res [string match OK* [r read]]
+        append res [r read]
+        append res [string match PONG* [r read]]
+        format $res
+    } {1xyzk1}
+
+    test {Non existing command} {
+        catch {r foobaredcommand} err
+        string match ERR* $err
+    } {1}
+
+    test {RENAME basic usage} {
+        r set mykey hello
+        r rename mykey mykey1
+        r rename mykey1 mykey2
+        r get mykey2
+    } {hello}
+
+    test {RENAME source key should no longer exist} {
+        r exists mykey
+    } {0}
+
+    test {RENAME against already existing key} {
+        r set mykey a
+        r set mykey2 b
+        r rename mykey2 mykey
+        set res [r get mykey]
+        append res [r exists mykey2]
+    } {b0}
+
+    test {RENAMENX basic usage} {
+        r del mykey
+        r del mykey2
+        r set mykey foobar
+        r renamenx mykey mykey2
+        set res [r get mykey2]
+        append res [r exists mykey]
+    } {foobar0}
+
+    test {RENAMENX against already existing key} {
+        r set mykey foo
+        r set mykey2 bar
+        r renamenx mykey mykey2
+    } {0}
+
+    test {RENAMENX against already existing key (2)} {
+        set res [r get mykey]
+        append res [r get mykey2]
+    } {foobar}
+
+    test {RENAME against non existing source key} {
+        catch {r rename nokey foobar} err
+        format $err
+    } {ERR*}
+
+    test {RENAME where source and dest key is the same} {
+        catch {r rename mykey mykey} err
+        format $err
+    } {ERR*}
+
+    test {RENAME with volatile key, should move the TTL as well} {
+        r del mykey mykey2
+        r set mykey foo
+        r expire mykey 100
+        assert {[r ttl mykey] > 95 && [r ttl mykey] <= 100}
+        r rename mykey mykey2
+        assert {[r ttl mykey2] > 95 && [r ttl mykey2] <= 100}
     }
 
-    test "GETEX EXAT option" {
-        r del foo
-        r set foo bar
-        r getex foo exat [expr [clock seconds] + 10]
-        assert_range [r ttl foo] 5 10
-    }
+    test {RENAME with volatile key, should not inherit TTL of target key} {
+        r del mykey mykey2
+        r set mykey foo
+        r set mykey2 bar
+        r expire mykey2 100
+        assert {[r ttl mykey] == -1 && [r ttl mykey2] > 0}
+        r rename mykey mykey2
+        r ttl mykey2
+    } {-1}
 
-    test "GETEX PXAT option" {
-        r del foo
-        r set foo bar
-        r getex foo pxat [expr [clock milliseconds] + 10000]
-        assert_range [r pttl foo] 5000 10000
-    }
-
-    test "GETEX PERSIST option" {
-        r del foo
-        r set foo bar ex 10
-        assert_range [r ttl foo] 5 10
-        r getex foo persist
-        assert_equal -1 [r ttl foo]
-    }
-
-    test "GETEX no option" {
-        r del foo
-        r set foo bar
-        r getex foo
-        assert_equal bar [r getex foo]
-    }
-
-    test "GETEX syntax errors" {
-        set ex {}
-        catch {r getex foo non-existent-option} ex
-        set ex
-    } {*syntax*}
-
-    test "GETEX no arguments" {
-         set ex {}
-         catch {r getex} ex
-         set ex
-     } {*wrong number of arguments for 'getex' command}
-
-    test "GETDEL command" {
-        r del foo
-        r set foo bar
-        assert_equal bar [r getdel foo ]
-        assert_equal {} [r getdel foo ]
-    }
-
-    test {GETDEL propagate as DEL command to replica} {
-        set repl [attach_to_replication_stream]
-        r set foo bar
-        r getdel foo
-        assert_replication_stream $repl {
-            {select *}
-            {set foo bar}
-            {del foo}
+    test {DEL all keys again (DB 0)} {
+        foreach key [r keys *] {
+            r del $key
         }
-        close_replication_stream $repl
-    } {} {needs:repl}
+        r dbsize
+    } {0}
 
-    test {GETEX without argument does not propagate to replica} {
-        set repl [attach_to_replication_stream]
-        r set foo bar
-        r getex foo
-        r del foo
-        assert_replication_stream $repl {
-            {select *}
-            {set foo bar}
-            {del foo}
+    test {DEL all keys again (DB 1)} {
+        r select 10
+        foreach key [r keys *] {
+            r del $key
         }
-        close_replication_stream $repl
-    } {} {needs:repl}
+        set res [r dbsize]
+        r select 9
+        format $res
+    } {0}
+
+    test {MOVE basic usage} {
+        r set mykey foobar
+        r move mykey 10
+        set res {}
+        lappend res [r exists mykey]
+        lappend res [r dbsize]
+        r select 10
+        lappend res [r get mykey]
+        lappend res [r dbsize]
+        r select 9
+        format $res
+    } [list 0 0 foobar 1]
+
+    test {MOVE against key existing in the target DB} {
+        r set mykey hello
+        r move mykey 10
+    } {0}
+
+    test {MOVE against non-integer DB (#1428)} {
+        r set mykey hello
+        catch {r move mykey notanumber} e
+        set e
+    } {*ERR*index out of range}
+
+    test {MOVE can move key expire metadata as well} {
+        r select 10
+        r flushdb
+        r select 9
+        r set mykey foo ex 100
+        r move mykey 10
+        assert {[r ttl mykey] == -2}
+        r select 10
+        assert {[r ttl mykey] > 0 && [r ttl mykey] <= 100}
+        assert {[r get mykey] eq "foo"}
+        r select 9
+    }
+
+    test {MOVE does not create an expire if it does not exist} {
+        r select 10
+        r flushdb
+        r select 9
+        r set mykey foo
+        r move mykey 10
+        assert {[r ttl mykey] == -2}
+        r select 10
+        assert {[r ttl mykey] == -1}
+        assert {[r get mykey] eq "foo"}
+        r select 9
+    }
+
+    test {SET/GET keys in different DBs} {
+        r set a hello
+        r set b world
+        r select 10
+        r set a foo
+        r set b bared
+        r select 9
+        set res {}
+        lappend res [r get a]
+        lappend res [r get b]
+        r select 10
+        lappend res [r get a]
+        lappend res [r get b]
+        r select 9
+        format $res
+    } {hello world foo bared}
 
     test {MGET} {
         r flushdb
-        r set foo{t} BAR
-        r set bar{t} FOO
-        r mget foo{t} bar{t}
+        r set foo BAR
+        r set bar FOO
+        r mget foo bar
     } {BAR FOO}
 
     test {MGET against non existing key} {
-        r mget foo{t} baazz{t} bar{t}
+        r mget foo baazz bar
     } {BAR {} FOO}
 
     test {MGET against non-string key} {
-        r sadd myset{t} ciao
-        r sadd myset{t} bau
-        r mget foo{t} baazz{t} bar{t} myset{t}
+        r sadd myset ciao
+        r sadd myset bau
+        r mget foo baazz bar myset
     } {BAR {} FOO {}}
 
+    test {RANDOMKEY} {
+        r flushdb
+        r set foo x
+        r set bar y
+        set foo_seen 0
+        set bar_seen 0
+        for {set i 0} {$i < 100} {incr i} {
+            set rkey [r randomkey]
+            if {$rkey eq {foo}} {
+                set foo_seen 1
+            }
+            if {$rkey eq {bar}} {
+                set bar_seen 1
+            }
+        }
+        list $foo_seen $bar_seen
+    } {1 1}
+
+    test {RANDOMKEY against empty DB} {
+        r flushdb
+        r randomkey
+    } {}
+
+    test {RANDOMKEY regression 1} {
+        r flushdb
+        r set x 10
+        r del x
+        r randomkey
+    } {}
+
     test {GETSET (set new value)} {
-        r del foo
         list [r getset foo xyz] [r get foo]
     } {{} xyz}
 
@@ -217,21 +533,21 @@ start_server {tags {"string"}} {
     } {bar xyz}
 
     test {MSET base case} {
-        r mset x{t} 10 y{t} "foo bar" z{t} "x x x x x x x\n\n\r\n"
-        r mget x{t} y{t} z{t}
+        r mset x 10 y "foo bar" z "x x x x x x x\n\n\r\n"
+        r mget x y z
     } [list 10 {foo bar} "x x x x x x x\n\n\r\n"]
 
-    test {MSET/MSETNX wrong number of args} {
-        assert_error {*wrong number of arguments for 'mset' command} {r mset x{t} 10 y{t} "foo bar" z{t}}
-        assert_error {*wrong number of arguments for 'msetnx' command} {r msetnx x{t} 20 y{t} "foo bar" z{t}}
-    }
+    test {MSET wrong number of args} {
+        catch {r mset x 10 y "foo bar" z} err
+        format $err
+    } {*wrong number*}
 
     test {MSETNX with already existent key} {
-        list [r msetnx x1{t} xxx y2{t} yyy x{t} 20] [r exists x1{t}] [r exists y2{t}]
+        list [r msetnx x1 xxx y2 yyy x 20] [r exists x1] [r exists y2]
     } {0 0 0}
 
     test {MSETNX with not existing keys} {
-        list [r msetnx x1{t} xxx y2{t} yyy] [r get x1{t}] [r get y2{t}]
+        list [r msetnx x1 xxx y2 yyy] [r get x1] [r get y2]
     } {1 xxx yyy}
 
     test "STRLEN against non-existing key" {
@@ -459,15 +775,6 @@ start_server {tags {"string"}} {
             assert_equal [string range $bin $_start $_end] [r getrange bin $start $end]
         }
     }
-    
-    test {trim on SET with big value} {
-        # set a big value to trigger increasing the query buf
-        r set key [string repeat A 100000] 
-        # set a smaller value but > PROTO_MBULK_BIG_ARG (32*1024) Redis will try to save the query buf itself on the DB.
-        r set key [string repeat A 33000]
-        # asset the value was trimmed
-        assert {[r memory usage key] < 42000}; # 42K to count for Jemalloc's additional memory overhead. 
-    }
 
     test {Extended SET can detect syntax errors} {
         set e {}
@@ -490,59 +797,6 @@ start_server {tags {"string"}} {
         list $v1 $v2 [r get foo]
     } {{} OK 2}
 
-    test {Extended SET GET option} {
-        r del foo
-        r set foo bar
-        set old_value [r set foo bar2 GET]
-        set new_value [r get foo]
-        list $old_value $new_value
-    } {bar bar2}
-
-    test {Extended SET GET option with no previous value} {
-        r del foo
-        set old_value [r set foo bar GET]
-        set new_value [r get foo]
-        list $old_value $new_value
-    } {{} bar}
-
-    test {Extended SET GET option with XX} {
-        r del foo
-        r set foo bar
-        set old_value [r set foo baz GET XX]
-        set new_value [r get foo]
-        list $old_value $new_value
-    } {bar baz}
-
-    test {Extended SET GET option with XX and no previous value} {
-        r del foo
-        set old_value [r set foo bar GET XX]
-        set new_value [r get foo]
-        list $old_value $new_value
-    } {{} {}}
-
-    test {Extended SET GET option with NX} {
-        r del foo
-        set old_value [r set foo bar GET NX]
-        set new_value [r get foo]
-        list $old_value $new_value
-    } {{} bar}
-
-    test {Extended SET GET option with NX and previous value} {
-        r del foo
-        r set foo bar
-        set old_value [r set foo baz GET NX]
-        set new_value [r get foo]
-        list $old_value $new_value
-    } {bar bar}
-
-    test {Extended SET GET with incorrect type should result in wrong type error} {
-      r del foo
-      r rpush foo waffle
-      catch {r set foo bar GET} err1
-      assert_equal "waffle" [r rpop foo]
-      set err1
-    } {*WRONGTYPE*}
-
     test {Extended SET EX option} {
         r del foo
         r set foo bar ex 10
@@ -557,17 +811,6 @@ start_server {tags {"string"}} {
         assert {$ttl <= 10 && $ttl > 5}
     }
 
-    test "Extended SET EXAT option" {
-        r del foo
-        r set foo bar exat [expr [clock seconds] + 10]
-        assert_range [r ttl foo] 5 10
-    }
-
-    test "Extended SET PXAT option" {
-        r del foo
-        r set foo bar pxat [expr [clock milliseconds] + 10000]
-        assert_range [r ttl foo] 5 10
-    }
     test {Extended SET using multiple options at once} {
         r set foo val
         assert {[r set foo bar xx px 10000] eq {OK}}
@@ -575,46 +818,15 @@ start_server {tags {"string"}} {
         assert {$ttl <= 10 && $ttl > 5}
     }
 
+    test {KEYS * two times with long key, Github issue #1208} {
+        r flushdb
+        r set dlskeriewrioeuwqoirueioqwrueoqwrueqw test
+        r keys *
+        r keys *
+    } {dlskeriewrioeuwqoirueioqwrueoqwrueqw}
+
     test {GETRANGE with huge ranges, Github issue #1844} {
         r set foo bar
         r getrange foo 0 4294967297
     } {bar}
-
-    set rna1 {CACCTTCCCAGGTAACAAACCAACCAACTTTCGATCTCTTGTAGATCTGTTCTCTAAACGAACTTTAAAATCTGTGTGGCTGTCACTCGGCTGCATGCTTAGTGCACTCACGCAGTATAATTAATAACTAATTACTGTCGTTGACAGGACACGAGTAACTCGTCTATCTTCTGCAGGCTGCTTACGGTTTCGTCCGTGTTGCAGCCGATCATCAGCACATCTAGGTTTCGTCCGGGTGTG}
-    set rna2 {ATTAAAGGTTTATACCTTCCCAGGTAACAAACCAACCAACTTTCGATCTCTTGTAGATCTGTTCTCTAAACGAACTTTAAAATCTGTGTGGCTGTCACTCGGCTGCATGCTTAGTGCACTCACGCAGTATAATTAATAACTAATTACTGTCGTTGACAGGACACGAGTAACTCGTCTATCTTCTGCAGGCTGCTTACGGTTTCGTCCGTGTTGCAGCCGATCATCAGCACATCTAGGTTT}
-    set rnalcs {ACCTTCCCAGGTAACAAACCAACCAACTTTCGATCTCTTGTAGATCTGTTCTCTAAACGAACTTTAAAATCTGTGTGGCTGTCACTCGGCTGCATGCTTAGTGCACTCACGCAGTATAATTAATAACTAATTACTGTCGTTGACAGGACACGAGTAACTCGTCTATCTTCTGCAGGCTGCTTACGGTTTCGTCCGTGTTGCAGCCGATCATCAGCACATCTAGGTTT}
-
-    test {LCS basic} {
-        r set virus1{t} $rna1
-        r set virus2{t} $rna2
-        r LCS virus1{t} virus2{t}
-    } $rnalcs
-
-    test {LCS len} {
-        r set virus1{t} $rna1
-        r set virus2{t} $rna2
-        r LCS virus1{t} virus2{t} LEN
-    } [string length $rnalcs]
-
-    test {LCS indexes} {
-        dict get [r LCS virus1{t} virus2{t} IDX] matches
-    } {{{238 238} {239 239}} {{236 236} {238 238}} {{229 230} {236 237}} {{224 224} {235 235}} {{1 222} {13 234}}}
-
-    test {LCS indexes with match len} {
-        dict get [r LCS virus1{t} virus2{t} IDX WITHMATCHLEN] matches
-    } {{{238 238} {239 239} 1} {{236 236} {238 238} 1} {{229 230} {236 237} 2} {{224 224} {235 235} 1} {{1 222} {13 234} 222}}
-
-    test {LCS indexes with match len and minimum match len} {
-        dict get [r LCS virus1{t} virus2{t} IDX WITHMATCHLEN MINMATCHLEN 5] matches
-    } {{{1 222} {13 234} 222}}
-
-    test {SETRANGE with huge offset} {
-        foreach value {9223372036854775807 2147483647} {
-            catch {[r setrange K $value A]} res
-            # expecting a different error on 32 and 64 bit systems
-            if {![string match "*string exceeds maximum allowed size*" $res] && ![string match "*out of range*" $res]} {
-                assert_equal $res "expecting an error"
-           }
-        }
-    }
 }

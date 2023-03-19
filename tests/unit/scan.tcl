@@ -1,7 +1,7 @@
-start_server {tags {"scan network"}} {
+start_server {tags {"scan"}} {
     test "SCAN basic" {
         r flushdb
-        populate 1000
+        r debug populate 1000
 
         set cur 0
         set keys {}
@@ -19,7 +19,7 @@ start_server {tags {"scan network"}} {
 
     test "SCAN COUNT" {
         r flushdb
-        populate 1000
+        r debug populate 1000
 
         set cur 0
         set keys {}
@@ -37,7 +37,7 @@ start_server {tags {"scan network"}} {
 
     test "SCAN MATCH" {
         r flushdb
-        populate 1000
+        r debug populate 1000
 
         set cur 0
         set keys {}
@@ -53,52 +53,7 @@ start_server {tags {"scan network"}} {
         assert_equal 100 [llength $keys]
     }
 
-    test "SCAN TYPE" {
-        r flushdb
-        # populate only creates strings
-        populate 1000
-
-        # Check non-strings are excluded
-        set cur 0
-        set keys {}
-        while 1 {
-            set res [r scan $cur type "list"]
-            set cur [lindex $res 0]
-            set k [lindex $res 1]
-            lappend keys {*}$k
-            if {$cur == 0} break
-        }
-
-        assert_equal 0 [llength $keys]
-
-        # Check strings are included
-        set cur 0
-        set keys {}
-        while 1 {
-            set res [r scan $cur type "string"]
-            set cur [lindex $res 0]
-            set k [lindex $res 1]
-            lappend keys {*}$k
-            if {$cur == 0} break
-        }
-
-        assert_equal 1000 [llength $keys]
-
-        # Check all three args work together
-        set cur 0
-        set keys {}
-        while 1 {
-            set res [r scan $cur type "string" match "key:*" count 10]
-            set cur [lindex $res 0]
-            set k [lindex $res 1]
-            lappend keys {*}$k
-            if {$cur == 0} break
-        }
-
-        assert_equal 1000 [llength $keys]
-    }
-
-    foreach enc {intset listpack hashtable} {
+    foreach enc {intset hashtable} {
         test "SSCAN with encoding $enc" {
             # Create the Set
             r del set
@@ -107,15 +62,14 @@ start_server {tags {"scan network"}} {
             } else {
                 set prefix "ele:"
             }
-            set count [expr {$enc eq "hashtable" ? 200 : 100}]
             set elements {}
-            for {set j 0} {$j < $count} {incr j} {
+            for {set j 0} {$j < 100} {incr j} {
                 lappend elements ${prefix}${j}
             }
             r sadd set {*}$elements
 
             # Verify that the encoding matches.
-            assert_encoding $enc set
+            assert {[r object encoding set] eq $enc}
 
             # Test SSCAN
             set cur 0
@@ -129,15 +83,15 @@ start_server {tags {"scan network"}} {
             }
 
             set keys [lsort -unique $keys]
-            assert_equal $count [llength $keys]
+            assert_equal 100 [llength $keys]
         }
     }
 
-    foreach enc {listpack hashtable} {
+    foreach enc {ziplist hashtable} {
         test "HSCAN with encoding $enc" {
             # Create the Hash
             r del hash
-            if {$enc eq {listpack}} {
+            if {$enc eq {ziplist}} {
                 set count 30
             } else {
                 set count 1000
@@ -149,7 +103,7 @@ start_server {tags {"scan network"}} {
             r hmset hash {*}$elements
 
             # Verify that the encoding matches.
-            assert_encoding $enc hash
+            assert {[r object encoding hash] eq $enc}
 
             # Test HSCAN
             set cur 0
@@ -173,11 +127,11 @@ start_server {tags {"scan network"}} {
         }
     }
 
-    foreach enc {listpack skiplist} {
+    foreach enc {ziplist skiplist} {
         test "ZSCAN with encoding $enc" {
             # Create the Sorted Set
             r del zset
-            if {$enc eq {listpack}} {
+            if {$enc eq {ziplist}} {
                 set count 30
             } else {
                 set count 1000
@@ -189,7 +143,7 @@ start_server {tags {"scan network"}} {
             r zadd zset {*}$elements
 
             # Verify that the encoding matches.
-            assert_encoding $enc zset
+            assert {[r object encoding zset] eq $enc}
 
             # Test ZSCAN
             set cur 0
@@ -215,7 +169,7 @@ start_server {tags {"scan network"}} {
 
     test "SCAN guarantees check under write load" {
         r flushdb
-        populate 100
+        r debug populate 100
 
         # We start scanning here, so keys from 0 to 99 should all be
         # reported at the end of the iteration.
@@ -281,51 +235,5 @@ start_server {tags {"scan network"}} {
         set res [lindex [r zscan mykey 0] 1]
         set first_score [lindex $res 1]
         assert {$first_score != 0}
-    }
-
-    test "SCAN regression test for issue #4906" {
-        for {set k 0} {$k < 100} {incr k} {
-            r del set
-            r sadd set x; # Make sure it's not intset encoded
-            set toremove {}
-            unset -nocomplain found
-            array set found {}
-
-            # Populate the set
-            set numele [expr {101+[randomInt 1000]}]
-            for {set j 0} {$j < $numele} {incr j} {
-                r sadd set $j
-                if {$j >= 100} {
-                    lappend toremove $j
-                }
-            }
-
-            # Start scanning
-            set cursor 0
-            set iteration 0
-            set del_iteration [randomInt 10]
-            while {!($cursor == 0 && $iteration != 0)} {
-                lassign [r sscan set $cursor] cursor items
-
-                # Mark found items. We expect to find from 0 to 99 at the end
-                # since those elements will never be removed during the scanning.
-                foreach i $items {
-                    set found($i) 1
-                }
-                incr iteration
-                # At some point remove most of the items to trigger the
-                # rehashing to a smaller hash table.
-                if {$iteration == $del_iteration} {
-                    r srem set {*}$toremove
-                }
-            }
-
-            # Verify that SSCAN reported everything from 0 to 99
-            for {set j 0} {$j < 100} {incr j} {
-                if {![info exists found($j)]} {
-                    fail "SSCAN element missing $j"
-                }
-            }
-        }
     }
 }

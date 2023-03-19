@@ -1,76 +1,59 @@
-#define JEMALLOC_MALLOC_IO_C_
-#include "jemalloc/internal/jemalloc_preamble.h"
-#include "jemalloc/internal/jemalloc_internal_includes.h"
-
-#include "jemalloc/internal/malloc_io.h"
-#include "jemalloc/internal/util.h"
-
-#ifdef assert
-#  undef assert
-#endif
-#ifdef not_reached
-#  undef not_reached
-#endif
-#ifdef not_implemented
-#  undef not_implemented
-#endif
-#ifdef assert_not_implemented
-#  undef assert_not_implemented
-#endif
-
-/*
- * Define simple versions of assertion macros that won't recurse in case
- * of assertion failures in malloc_*printf().
- */
-#define assert(e) do {							\
+#define	assert(e) do {							\
 	if (config_debug && !(e)) {					\
 		malloc_write("<jemalloc>: Failed assertion\n");		\
 		abort();						\
 	}								\
 } while (0)
 
-#define not_reached() do {						\
+#define	not_reached() do {						\
 	if (config_debug) {						\
 		malloc_write("<jemalloc>: Unreachable code reached\n");	\
 		abort();						\
 	}								\
-	unreachable();							\
 } while (0)
 
-#define not_implemented() do {						\
+#define	not_implemented() do {						\
 	if (config_debug) {						\
 		malloc_write("<jemalloc>: Not implemented\n");		\
 		abort();						\
 	}								\
 } while (0)
 
-#define assert_not_implemented(e) do {					\
-	if (unlikely(config_debug && !(e))) {				\
-		not_implemented();					\
-	}								\
-} while (0)
+#define	JEMALLOC_UTIL_C_
+#include "jemalloc/internal/jemalloc_internal.h"
 
 /******************************************************************************/
 /* Function prototypes for non-inline static functions. */
 
-static void wrtmessage(void *cbopaque, const char *s);
-#define U2S_BUFSIZE ((1U << (LG_SIZEOF_INTMAX_T + 3)) + 1)
-static char *u2s(uintmax_t x, unsigned base, bool uppercase, char *s,
+static void	wrtmessage(void *cbopaque, const char *s);
+#define	U2S_BUFSIZE	((1U << (LG_SIZEOF_INTMAX_T + 3)) + 1)
+static char	*u2s(uintmax_t x, unsigned base, bool uppercase, char *s,
     size_t *slen_p);
-#define D2S_BUFSIZE (1 + U2S_BUFSIZE)
-static char *d2s(intmax_t x, char sign, char *s, size_t *slen_p);
-#define O2S_BUFSIZE (1 + U2S_BUFSIZE)
-static char *o2s(uintmax_t x, bool alt_form, char *s, size_t *slen_p);
-#define X2S_BUFSIZE (2 + U2S_BUFSIZE)
-static char *x2s(uintmax_t x, bool alt_form, bool uppercase, char *s,
+#define	D2S_BUFSIZE	(1 + U2S_BUFSIZE)
+static char	*d2s(intmax_t x, char sign, char *s, size_t *slen_p);
+#define	O2S_BUFSIZE	(1 + U2S_BUFSIZE)
+static char	*o2s(uintmax_t x, bool alt_form, char *s, size_t *slen_p);
+#define	X2S_BUFSIZE	(2 + U2S_BUFSIZE)
+static char	*x2s(uintmax_t x, bool alt_form, bool uppercase, char *s,
     size_t *slen_p);
 
 /******************************************************************************/
 
 /* malloc_message() setup. */
 static void
-wrtmessage(void *cbopaque, const char *s) {
-	malloc_write_fd(STDERR_FILENO, s, strlen(s));
+wrtmessage(void *cbopaque, const char *s)
+{
+
+#ifdef SYS_write
+	/*
+	 * Use syscall(2) rather than write(2) when possible in order to avoid
+	 * the possibility of memory allocation within libc.  This is necessary
+	 * on FreeBSD; most operating systems do not have this problem though.
+	 */
+	UNUSED int result = syscall(SYS_write, STDERR_FILENO, s, strlen(s));
+#else
+	UNUSED int result = write(STDERR_FILENO, s, strlen(s));
+#endif
 }
 
 JEMALLOC_EXPORT void	(*je_malloc_message)(void *, const char *s);
@@ -80,12 +63,13 @@ JEMALLOC_EXPORT void	(*je_malloc_message)(void *, const char *s);
  * je_malloc_message(...) throughout the code.
  */
 void
-malloc_write(const char *s) {
-	if (je_malloc_message != NULL) {
+malloc_write(const char *s)
+{
+
+	if (je_malloc_message != NULL)
 		je_malloc_message(NULL, s);
-	} else {
+	else
 		wrtmessage(NULL, s);
-	}
 }
 
 /*
@@ -93,27 +77,30 @@ malloc_write(const char *s) {
  * provide a wrapper.
  */
 int
-buferror(int err, char *buf, size_t buflen) {
+buferror(int err, char *buf, size_t buflen)
+{
+
 #ifdef _WIN32
-	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, err, 0,
-	    (LPSTR)buf, (DWORD)buflen, NULL);
-	return 0;
-#elif defined(JEMALLOC_STRERROR_R_RETURNS_CHAR_WITH_GNU_SOURCE) && defined(_GNU_SOURCE)
+	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, GetLastError(), 0,
+	    (LPSTR)buf, buflen, NULL);
+	return (0);
+#elif defined(_GNU_SOURCE)
 	char *b = strerror_r(err, buf, buflen);
 	if (b != buf) {
 		strncpy(buf, b, buflen);
 		buf[buflen-1] = '\0';
 	}
-	return 0;
+	return (0);
 #else
-	return strerror_r(err, buf, buflen);
+	return (strerror_r(err, buf, buflen));
 #endif
 }
 
 uintmax_t
-malloc_strtoumax(const char *restrict nptr, char **restrict endptr, int base) {
+malloc_strtoumax(const char *restrict nptr, char **restrict endptr, int base)
+{
 	uintmax_t ret, digit;
-	unsigned b;
+	int b;
 	bool neg;
 	const char *p, *ns;
 
@@ -156,12 +143,10 @@ malloc_strtoumax(const char *restrict nptr, char **restrict endptr, int base) {
 		switch (p[1]) {
 		case '0': case '1': case '2': case '3': case '4': case '5':
 		case '6': case '7':
-			if (b == 0) {
+			if (b == 0)
 				b = 8;
-			}
-			if (b == 8) {
+			if (b == 8)
 				p++;
-			}
 			break;
 		case 'X': case 'x':
 			switch (p[2]) {
@@ -171,12 +156,10 @@ malloc_strtoumax(const char *restrict nptr, char **restrict endptr, int base) {
 			case 'F':
 			case 'a': case 'b': case 'c': case 'd': case 'e':
 			case 'f':
-				if (b == 0) {
+				if (b == 0)
 					b = 16;
-				}
-				if (b == 16) {
+				if (b == 16)
 					p += 2;
-				}
 				break;
 			default:
 				break;
@@ -188,9 +171,8 @@ malloc_strtoumax(const char *restrict nptr, char **restrict endptr, int base) {
 			goto label_return;
 		}
 	}
-	if (b == 0) {
+	if (b == 0)
 		b = 10;
-	}
 
 	/* Convert. */
 	ret = 0;
@@ -208,9 +190,8 @@ malloc_strtoumax(const char *restrict nptr, char **restrict endptr, int base) {
 		}
 		p++;
 	}
-	if (neg) {
-		ret = (uintmax_t)(-((intmax_t)ret));
-	}
+	if (neg)
+		ret = -ret;
 
 	if (p == ns) {
 		/* No conversion performed. */
@@ -224,15 +205,15 @@ label_return:
 		if (p == ns) {
 			/* No characters were converted. */
 			*endptr = (char *)nptr;
-		} else {
+		} else
 			*endptr = (char *)p;
-		}
 	}
-	return ret;
+	return (ret);
 }
 
 static char *
-u2s(uintmax_t x, unsigned base, bool uppercase, char *s, size_t *slen_p) {
+u2s(uintmax_t x, unsigned base, bool uppercase, char *s, size_t *slen_p)
+{
 	unsigned i;
 
 	i = U2S_BUFSIZE - 1;
@@ -270,25 +251,23 @@ u2s(uintmax_t x, unsigned base, bool uppercase, char *s, size_t *slen_p) {
 	}}
 
 	*slen_p = U2S_BUFSIZE - 1 - i;
-	return &s[i];
+	return (&s[i]);
 }
 
 static char *
-d2s(intmax_t x, char sign, char *s, size_t *slen_p) {
+d2s(intmax_t x, char sign, char *s, size_t *slen_p)
+{
 	bool neg;
 
-	if ((neg = (x < 0))) {
+	if ((neg = (x < 0)))
 		x = -x;
-	}
 	s = u2s(x, 10, false, s, slen_p);
-	if (neg) {
+	if (neg)
 		sign = '-';
-	}
 	switch (sign) {
 	case '-':
-		if (!neg) {
+		if (neg == false)
 			break;
-		}
 		/* Fall through. */
 	case ' ':
 	case '+':
@@ -298,71 +277,74 @@ d2s(intmax_t x, char sign, char *s, size_t *slen_p) {
 		break;
 	default: not_reached();
 	}
-	return s;
+	return (s);
 }
 
 static char *
-o2s(uintmax_t x, bool alt_form, char *s, size_t *slen_p) {
+o2s(uintmax_t x, bool alt_form, char *s, size_t *slen_p)
+{
+
 	s = u2s(x, 8, false, s, slen_p);
 	if (alt_form && *s != '0') {
 		s--;
 		(*slen_p)++;
 		*s = '0';
 	}
-	return s;
+	return (s);
 }
 
 static char *
-x2s(uintmax_t x, bool alt_form, bool uppercase, char *s, size_t *slen_p) {
+x2s(uintmax_t x, bool alt_form, bool uppercase, char *s, size_t *slen_p)
+{
+
 	s = u2s(x, 16, uppercase, s, slen_p);
 	if (alt_form) {
 		s -= 2;
 		(*slen_p) += 2;
 		memcpy(s, uppercase ? "0X" : "0x", 2);
 	}
-	return s;
+	return (s);
 }
 
-size_t
-malloc_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
+int
+malloc_vsnprintf(char *str, size_t size, const char *format, va_list ap)
+{
+	int ret;
 	size_t i;
 	const char *f;
 
-#define APPEND_C(c) do {						\
-	if (i < size) {							\
+#define	APPEND_C(c) do {						\
+	if (i < size)							\
 		str[i] = (c);						\
-	}								\
 	i++;								\
 } while (0)
-#define APPEND_S(s, slen) do {						\
+#define	APPEND_S(s, slen) do {						\
 	if (i < size) {							\
 		size_t cpylen = (slen <= size - i) ? slen : size - i;	\
 		memcpy(&str[i], s, cpylen);				\
 	}								\
 	i += slen;							\
 } while (0)
-#define APPEND_PADDED_S(s, slen, width, left_justify) do {		\
+#define	APPEND_PADDED_S(s, slen, width, left_justify) do {		\
 	/* Left padding. */						\
 	size_t pad_len = (width == -1) ? 0 : ((slen < (size_t)width) ?	\
 	    (size_t)width - slen : 0);					\
-	if (!left_justify && pad_len != 0) {				\
+	if (left_justify == false && pad_len != 0) {			\
 		size_t j;						\
-		for (j = 0; j < pad_len; j++) {				\
+		for (j = 0; j < pad_len; j++)				\
 			APPEND_C(' ');					\
-		}							\
 	}								\
 	/* Value. */							\
 	APPEND_S(s, slen);						\
 	/* Right padding. */						\
 	if (left_justify && pad_len != 0) {				\
 		size_t j;						\
-		for (j = 0; j < pad_len; j++) {				\
+		for (j = 0; j < pad_len; j++)				\
 			APPEND_C(' ');					\
-		}							\
 	}								\
 } while (0)
-#define GET_ARG_NUMERIC(val, len) do {					\
-	switch ((unsigned char)len) {					\
+#define	GET_ARG_NUMERIC(val, len) do {					\
+	switch (len) {							\
 	case '?':							\
 		val = va_arg(ap, int);					\
 		break;							\
@@ -399,9 +381,7 @@ malloc_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 	case 'p': /* Synthetic; used for %p. */				\
 		val = va_arg(ap, uintptr_t);				\
 		break;							\
-	default:							\
-		not_reached();						\
-		val = 0;						\
+	default: not_reached();						\
 	}								\
 } while (0)
 
@@ -418,27 +398,25 @@ malloc_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 			int prec = -1;
 			int width = -1;
 			unsigned char len = '?';
-			char *s;
-			size_t slen;
 
 			f++;
 			/* Flags. */
 			while (true) {
 				switch (*f) {
 				case '#':
-					assert(!alt_form);
+					assert(alt_form == false);
 					alt_form = true;
 					break;
 				case '-':
-					assert(!left_justify);
+					assert(left_justify == false);
 					left_justify = true;
 					break;
 				case ' ':
-					assert(!plus_space);
+					assert(plus_space == false);
 					plus_space = true;
 					break;
 				case '+':
-					assert(!plus_plus);
+					assert(plus_plus == false);
 					plus_plus = true;
 					break;
 				default: goto label_width;
@@ -469,11 +447,10 @@ malloc_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 				break;
 			}
 			/* Width/precision separator. */
-			if (*f == '.') {
+			if (*f == '.')
 				f++;
-			} else {
+			else
 				goto label_length;
-			}
 			/* Precision. */
 			switch (*f) {
 			case '*':
@@ -500,9 +477,8 @@ malloc_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 				if (*f == 'l') {
 					len = 'q';
 					f++;
-				} else {
+				} else
 					len = 'l';
-				}
 				break;
 			case 'q': case 'j': case 't': case 'z':
 				len = *f;
@@ -512,6 +488,8 @@ malloc_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 			}
 			/* Conversion specifier. */
 			switch (*f) {
+				char *s;
+				size_t slen;
 			case '%':
 				/* %% */
 				APPEND_C(*f);
@@ -570,7 +548,7 @@ malloc_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 				assert(len == '?' || len == 'l');
 				assert_not_implemented(len != 'l');
 				s = va_arg(ap, char *);
-				slen = (prec < 0) ? strlen(s) : (size_t)prec;
+				slen = (prec < 0) ? strlen(s) : prec;
 				APPEND_PADDED_S(s, slen, width, left_justify);
 				f++;
 				break;
@@ -593,35 +571,37 @@ malloc_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
 		}}
 	}
 	label_out:
-	if (i < size) {
+	if (i < size)
 		str[i] = '\0';
-	} else {
+	else
 		str[size - 1] = '\0';
-	}
+	ret = i;
 
 #undef APPEND_C
 #undef APPEND_S
 #undef APPEND_PADDED_S
 #undef GET_ARG_NUMERIC
-	return i;
+	return (ret);
 }
 
-JEMALLOC_FORMAT_PRINTF(3, 4)
-size_t
-malloc_snprintf(char *str, size_t size, const char *format, ...) {
-	size_t ret;
+JEMALLOC_ATTR(format(printf, 3, 4))
+int
+malloc_snprintf(char *str, size_t size, const char *format, ...)
+{
+	int ret;
 	va_list ap;
 
 	va_start(ap, format);
 	ret = malloc_vsnprintf(str, size, format, ap);
 	va_end(ap);
 
-	return ret;
+	return (ret);
 }
 
 void
 malloc_vcprintf(void (*write_cb)(void *, const char *), void *cbopaque,
-    const char *format, va_list ap) {
+    const char *format, va_list ap)
+{
 	char buf[MALLOC_PRINTF_BUFSIZE];
 
 	if (write_cb == NULL) {
@@ -632,6 +612,7 @@ malloc_vcprintf(void (*write_cb)(void *, const char *), void *cbopaque,
 		 */
 		write_cb = (je_malloc_message != NULL) ? je_malloc_message :
 		    wrtmessage;
+		cbopaque = NULL;
 	}
 
 	malloc_vsnprintf(buf, sizeof(buf), format, ap);
@@ -642,10 +623,11 @@ malloc_vcprintf(void (*write_cb)(void *, const char *), void *cbopaque,
  * Print to a callback function in such a way as to (hopefully) avoid memory
  * allocation.
  */
-JEMALLOC_FORMAT_PRINTF(3, 4)
+JEMALLOC_ATTR(format(printf, 3, 4))
 void
 malloc_cprintf(void (*write_cb)(void *, const char *), void *cbopaque,
-    const char *format, ...) {
+    const char *format, ...)
+{
 	va_list ap;
 
 	va_start(ap, format);
@@ -654,22 +636,13 @@ malloc_cprintf(void (*write_cb)(void *, const char *), void *cbopaque,
 }
 
 /* Print to stderr in such a way as to avoid memory allocation. */
-JEMALLOC_FORMAT_PRINTF(1, 2)
+JEMALLOC_ATTR(format(printf, 1, 2))
 void
-malloc_printf(const char *format, ...) {
+malloc_printf(const char *format, ...)
+{
 	va_list ap;
 
 	va_start(ap, format);
 	malloc_vcprintf(NULL, NULL, format, ap);
 	va_end(ap);
 }
-
-/*
- * Restore normal assertion macros, in order to make it possible to compile all
- * C files as a single concatenation.
- */
-#undef assert
-#undef not_reached
-#undef not_implemented
-#undef assert_not_implemented
-#include "jemalloc/internal/assert.h"

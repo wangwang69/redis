@@ -7,7 +7,7 @@
 #include "jemalloc/internal/spin.h"
 
 #ifndef _CRT_SPINCOUNT
-#define _CRT_SPINCOUNT 4000
+#define	_CRT_SPINCOUNT 4000
 #endif
 
 /******************************************************************************/

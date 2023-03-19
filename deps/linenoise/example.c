@@ -11,15 +11,6 @@ void completion(const char *buf, linenoiseCompletions *lc) {
     }
 }
 
-char *hints(const char *buf, int *color, int *bold) {
-    if (!strcasecmp(buf,"hello")) {
-        *color = 35;
-        *bold = 0;
-        return " World";
-    }
-    return NULL;
-}
-
 int main(int argc, char **argv) {
     char *line;
     char *prgname = argv[0];
@@ -43,7 +34,6 @@ int main(int argc, char **argv) {
     /* Set the completion callback. This will be called every time the
      * user uses the <tab> key. */
     linenoiseSetCompletionCallback(completion);
-    linenoiseSetHintsCallback(hints);
 
     /* Load history from file. The history file is just a plain text file
      * where entries are separated by newlines. */
@@ -55,7 +45,6 @@ int main(int argc, char **argv) {
      *
      * The typed string is returned as a malloc() allocated string by
      * linenoise, so the user needs to free() it. */
-    
     while((line = linenoise("hello> ")) != NULL) {
         /* Do something with the string. */
         if (line[0] != '\0' && line[0] != '/') {
@@ -66,10 +55,6 @@ int main(int argc, char **argv) {
             /* The "/historylen" command will change the history len. */
             int len = atoi(line+11);
             linenoiseHistorySetMaxLen(len);
-        } else if (!strncmp(line, "/mask", 5)) {
-            linenoiseMaskModeEnable();
-        } else if (!strncmp(line, "/unmask", 7)) {
-            linenoiseMaskModeDisable();
         } else if (line[0] == '/') {
             printf("Unreconized command: %s\n", line);
         }
