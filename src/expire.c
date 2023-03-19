@@ -418,6 +418,10 @@ void expireSlaveKeys(void) {
         if ((cycles % 64) == 0 && mstime()-start > 1) break;
         if (dictSize(slaveKeysWithExpire) == 0) break;
     }
+
+    /* Propagate the DEL (writable replicas do not propagate anything to other replicas,
+     * but they might propagate to AOF) and trigger module hooks. */
+    propagatePendingCommands();
 }
 
 /* Track keys that received an EXPIRE or similar command in the context

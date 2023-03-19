@@ -59,8 +59,12 @@ TEST_MODULES = \
     moduleconfigs.so \
     moduleconfigstwo.so \
     publish.so \
+<<<<<<< HEAD
     usercall.so \
     postnotifications.so
+=======
+    usercall.so
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 
 .PHONY: all
 

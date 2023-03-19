@@ -423,6 +423,9 @@ proc start_server {options {code undefined}} {
             "config_lines" {
                 set config_lines $value
             }
+            "config_lines" {
+                set config_lines $value
+            }
             "args" {
                 set args $value
             }

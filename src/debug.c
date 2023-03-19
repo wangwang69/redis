@@ -34,7 +34,10 @@
 #include "crc64.h"
 #include "bio.h"
 #include "quicklist.h"
+<<<<<<< HEAD
 #include "fpconv_dtoa.h"
+=======
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 #include "cluster.h"
 
 #include <arpa/inet.h>
@@ -1242,8 +1245,11 @@ static void* getAndSetMcontextEip(ucontext_t *uc, void *eip) {
     #endif
 #elif defined(__DragonFly__)
     GET_SET_RETURN(uc->uc_mcontext.mc_rip, eip);
+<<<<<<< HEAD
 #elif defined(__sun) && defined(__x86_64__)
     GET_SET_RETURN(uc->uc_mcontext.gregs[REG_RIP], eip);
+=======
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 #else
     NOT_SUPPORTED();
 #endif

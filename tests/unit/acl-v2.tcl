@@ -194,9 +194,15 @@ start_server {tags {"acl external:skip"}} {
         assert_equal {0} [$r2 bitfield readstr get u4 0]
 
         # We don't have the permission to WRITE key.
+<<<<<<< HEAD
         assert_error {*NOPERM*key*} {$r2 bitfield readstr set u4 0 1}
         assert_error {*NOPERM*key*} {$r2 bitfield readstr get u4 0 set u4 0 1}
         assert_error {*NOPERM*key*} {$r2 bitfield readstr incrby u4 0 1}
+=======
+        assert_error {*NOPERM*keys*} {$r2 bitfield readstr set u4 0 1}
+        assert_error {*NOPERM*keys*} {$r2 bitfield readstr get u4 0 set u4 0 1}
+        assert_error {*NOPERM*keys*} {$r2 bitfield readstr incrby u4 0 1}
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
     }
 
     test {Test BITFIELD with separate write permission} {
@@ -320,6 +326,7 @@ start_server {tags {"acl external:skip"}} {
         assert_match {*has no permissions to access the 'read' key*} [r ACL DRYRUN command-test MIGRATE whatever whatever read 0 500]
         assert_match {*has no permissions to access the 'write' key*} [r ACL DRYRUN command-test MIGRATE whatever whatever write 0 500]
         assert_equal "OK" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 KEYS rw]
+<<<<<<< HEAD
         assert_match "*has no permissions to access the 'read' key" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 KEYS read]
         assert_match "*has no permissions to access the 'write' key" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 KEYS write]
         assert_equal "OK" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 AUTH KEYS KEYS rw]
@@ -331,6 +338,19 @@ start_server {tags {"acl external:skip"}} {
         assert_equal "OK" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 AUTH2 USER KEYS KEYS rw]
         assert_match "*has no permissions to access the 'read' key" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 AUTH2 USER KEYS KEYS read]
         assert_match "*has no permissions to access the 'write' key" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 AUTH2 USER KEYS KEYS write]
+=======
+        assert_equal "This user has no permissions to access the 'read' key" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 KEYS read]
+        assert_equal "This user has no permissions to access the 'write' key" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 KEYS write]
+        assert_equal "OK" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 AUTH KEYS KEYS rw]
+        assert_equal "This user has no permissions to access the 'read' key" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 AUTH KEYS KEYS read]
+        assert_equal "This user has no permissions to access the 'write' key" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 AUTH KEYS KEYS write]
+        assert_equal "OK" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 AUTH2 KEYS 123 KEYS rw]
+        assert_equal "This user has no permissions to access the 'read' key" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 AUTH2 KEYS 123 KEYS read]
+        assert_equal "This user has no permissions to access the 'write' key" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 AUTH2 KEYS 123 KEYS write]
+        assert_equal "OK" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 AUTH2 USER KEYS KEYS rw]
+        assert_equal "This user has no permissions to access the 'read' key" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 AUTH2 USER KEYS KEYS read]
+        assert_equal "This user has no permissions to access the 'write' key" [r ACL DRYRUN command-test MIGRATE whatever whatever "" 0 5000 AUTH2 USER KEYS KEYS write]
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 
         # Test SORT, which is marked with incomplete keys
         assert_equal "OK" [r ACL DRYRUN command-test SORT read STORE write]

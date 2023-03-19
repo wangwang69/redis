@@ -77,6 +77,7 @@ start_server {tags {"modules"}} {
         r list.getall k
     } {bar y foo}
 
+<<<<<<< HEAD
     test {Module list - encoding conversion while inserting} {
         r config set list-max-listpack-size 4
         r del k
@@ -112,6 +113,8 @@ start_server {tags {"modules"}} {
         assert_equal [r list.getall k] {y z}
     }
 
+=======
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
     test {Module list - list entry and index should be updated when deletion} {
         set original_config [config_get_set list-max-listpack-size 1]
 

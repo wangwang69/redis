@@ -4417,8 +4417,11 @@ int RM_ListDelete(RedisModuleKey *key, long index) {
     if (moduleListIteratorSeek(key, index, REDISMODULE_WRITE)) {
         listTypeDelete(key->iter, &key->u.list.entry);
         if (moduleDelKeyIfEmpty(key)) return REDISMODULE_OK;
+<<<<<<< HEAD
         listTypeTryConversion(key->value, LIST_CONV_SHRINKING, moduleFreeListIterator, key);
         if (!key->iter) return REDISMODULE_OK; /* Return ASAP if iterator has been freed */
+=======
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
         if (listTypeNext(key->iter, &key->u.list.entry)) {
             /* After delete entry at position 'index', we need to update
              * 'key->u.list.index' according to the following cases:
@@ -5766,7 +5769,10 @@ void RM_SetContextUser(RedisModuleCtx *ctx, const RedisModuleUser *user) {
  *     "3" -> REDISMODULE_ARGV_RESP_3
  *     "0" -> REDISMODULE_ARGV_RESP_AUTO
  *     "C" -> REDISMODULE_ARGV_RUN_AS_USER
+<<<<<<< HEAD
  *     "M" -> REDISMODULE_ARGV_RESPECT_DENY_OOM
+=======
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
  *
  * On error (format specifier error) NULL is returned and nothing is
  * allocated. On success the argument vector is returned. */
@@ -6027,7 +6033,11 @@ RedisModuleCallReply *RM_Call(RedisModuleCtx *ctx, const char *cmdname, const ch
         }
     }
 
+<<<<<<< HEAD
     if (flags & REDISMODULE_ARGV_RESPECT_DENY_OOM && server.maxmemory) {
+=======
+    if (flags & REDISMODULE_ARGV_RESPECT_DENY_OOM) {
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
         if (cmd_flags & CMD_DENYOOM) {
             int oom_state;
             if (ctx->flags & REDISMODULE_CTX_THREAD_SAFE) {
@@ -11064,8 +11074,11 @@ void moduleFireServerEvent(uint64_t eid, int subid, void *data) {
             RedisModuleClientInfoV1 civ1;
             RedisModuleReplicationInfoV1 riv1;
             RedisModuleModuleChangeV1 mcv1;
+<<<<<<< HEAD
             RedisModuleKey key;
             RedisModuleKeyInfoV1 ki = {REDISMODULE_KEYINFO_VERSION, &key};
+=======
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 
             /* Event specific context and data pointer setup. */
             if (eid == REDISMODULE_EVENT_CLIENT_CHANGE) {
@@ -11416,7 +11429,10 @@ void moduleFreeArgs(struct redisCommandArg *args, int num_args) {
         zfree((char *)args[j].summary);
         zfree((char *)args[j].since);
         zfree((char *)args[j].deprecated_since);
+<<<<<<< HEAD
         zfree((char *)args[j].display_text);
+=======
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 
         if (args[j].subargs) {
             moduleFreeArgs(args[j].subargs, args[j].num_args);

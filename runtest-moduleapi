@@ -51,5 +51,8 @@ $TCLSH tests/test_helper.tcl \
 --single unit/moduleapi/timer \
 --single unit/moduleapi/publish \
 --single unit/moduleapi/usercall \
+<<<<<<< HEAD
 --single unit/moduleapi/postnotifications \
+=======
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 "${@}"

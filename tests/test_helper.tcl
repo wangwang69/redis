@@ -8,7 +8,11 @@ set tcl_precision 17
 source tests/support/redis.tcl
 source tests/support/aofmanifest.tcl
 source tests/support/server.tcl
+<<<<<<< HEAD
 source tests/support/cluster_util.tcl
+=======
+source tests/support/cluster_helper.tcl
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 source tests/support/tmpfile.tcl
 source tests/support/test.tcl
 source tests/support/util.tcl
@@ -94,12 +98,18 @@ set ::all_tests {
     unit/client-eviction
     unit/violations
     unit/replybufsize
+<<<<<<< HEAD
     unit/cluster/misc
     unit/cluster/cli
     unit/cluster/scripting
     unit/cluster/hostnames
     unit/cluster/multi-slot-operations
     unit/cluster/slot-ownership
+=======
+    unit/cluster-scripting
+    unit/cluster/misc
+    unit/cluster/links
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 }
 # Index to the next test to run in the ::all_tests list.
 set ::next_test 0
@@ -296,6 +306,19 @@ proc s {args} {
 # Get the specified field from the givens instances cluster info output.
 proc CI {index field} {
     getInfoProperty [R $index cluster info] $field
+<<<<<<< HEAD
+=======
+}
+
+# Provide easy access to CLUSTER INFO properties. Same semantic as "proc s".
+proc csi {args} {
+    set level 0
+    if {[string is integer [lindex $args 0]]} {
+        set level [lindex $args 0]
+        set args [lrange $args 1 end]
+    }
+    cluster_info [srv $level "client"] [lindex $args 0]
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 }
 
 # Test wrapped into run_solo are sent back from the client to the

@@ -111,7 +111,11 @@ int bg_unlink(const char *filename) {
             errno = old_errno;
             return -1;
         }
+<<<<<<< HEAD
         bioCreateCloseJob(fd, 0, 0);
+=======
+        bioCreateCloseJob(fd, 0);
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
         return 0; /* Success. */
     }
 }
@@ -2188,7 +2192,11 @@ void readSyncBulkPayload(connection *conn) {
             return;
         }
         /* Close old rdb asynchronously. */
+<<<<<<< HEAD
         if (old_rdb_fd != -1) bioCreateCloseJob(old_rdb_fd, 0, 0);
+=======
+        if (old_rdb_fd != -1) bioCreateCloseJob(old_rdb_fd, 0);
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 
         /* Sync the directory to ensure rename is persisted */
         if (fsyncFileDir(server.rdb_filename) == -1) {

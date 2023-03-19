@@ -45,8 +45,12 @@
                 "type": "oneof",
                 "arguments": [
                     {
+<<<<<<< HEAD
                         "name": "old-format",
                         "display": "ip:port",
+=======
+                        "name": "ip:port",
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
                         "type": "string",
                         "deprecated_since": "2.8.12"
                     },
@@ -64,7 +68,11 @@
                             },
                             {
                                 "token": "TYPE",
+<<<<<<< HEAD
                                 "name": "client-type",
+=======
+                                "name": "normal_master_slave_pubsub",
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
                                 "type": "oneof",
                                 "optional": true,
                                 "since": "2.8.12",
@@ -106,21 +114,30 @@
                             },
                             {
                                 "token": "ADDR",
+<<<<<<< HEAD
                                 "name": "addr",
                                 "display": "ip:port",
+=======
+                                "name": "ip:port",
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
                                 "type": "string",
                                 "optional": true
                             },
                             {
                                 "token": "LADDR",
+<<<<<<< HEAD
                                 "name": "laddr",
                                 "display": "ip:port",
+=======
+                                "name": "ip:port",
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
                                 "type": "string",
                                 "optional": true,
                                 "since": "6.2.0"
                             },
                             {
                                 "token": "SKIPME",
+<<<<<<< HEAD
                                 "name": "skipme",
                                 "type": "oneof",
                                 "optional": true,
@@ -136,6 +153,11 @@
                                         "token": "NO"
                                     }
                                 ]
+=======
+                                "name": "yes/no",
+                                "type": "string",
+                                "optional": true
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
                             }
                         ]
                     }

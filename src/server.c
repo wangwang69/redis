@@ -2682,6 +2682,7 @@ void initServer(void) {
 
     if (server.maxmemory_clients != 0)
         initServerClientMemUsageBuckets();
+<<<<<<< HEAD
 }
 
 void initListeners() {
@@ -2754,6 +2755,8 @@ void initListeners() {
         serverLog(LL_WARNING, "Configured to not listen anywhere, exiting.");
         exit(1);
     }
+=======
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 }
 
 /* Some steps in server initialization need to be done last (after modules
@@ -3310,10 +3313,20 @@ static void propagatePendingCommands() {
     int j;
     redisOp *rop;
 
+<<<<<<< HEAD
     /* If we got here it means we have finished an execution-unit.
      * If that unit has caused propagation of multiple commands, they
      * should be propagated as a transaction */
     int transaction = server.also_propagate.numops > 1;
+=======
+    /* Wrap the commands in server.also_propagate array,
+     * but don't wrap it if we are already in MULTI context,
+     * in case the nested MULTI/EXEC.
+     *
+     * And if the array contains only one command, no need to
+     * wrap it, since the single command is atomic. */
+    int transaction = server.also_propagate.numops > 1 && !server.propagate_no_multi;
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 
     /* In case a command that may modify random keys was run *directly*
      * (i.e. not from within a script, MULTI/EXEC, RM_Call, etc.) we want
@@ -3326,9 +3339,16 @@ static void propagatePendingCommands() {
     }
 
     if (transaction) {
+<<<<<<< HEAD
         /* We use dbid=-1 to indicate we do not want to replicate SELECT.
          * It'll be inserted together with the next command (inside the MULTI) */
         propagateNow(-1,&shared.multi,1,PROPAGATE_AOF|PROPAGATE_REPL);
+=======
+        /* We use the first command-to-propagate to set the dbid for MULTI,
+         * so that the SELECT will be propagated beforehand */
+        int multi_dbid = server.also_propagate.ops[0].dbid;
+        propagateNow(multi_dbid,&shared.multi,1,PROPAGATE_AOF|PROPAGATE_REPL);
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
     }
 
     for (j = 0; j < server.also_propagate.numops; j++) {
@@ -3338,8 +3358,14 @@ static void propagatePendingCommands() {
     }
 
     if (transaction) {
+<<<<<<< HEAD
         /* We use dbid=-1 to indicate we do not want to replicate select */
         propagateNow(-1,&shared.exec,1,PROPAGATE_AOF|PROPAGATE_REPL);
+=======
+        /* We take the dbid from last command so that propagateNow() won't inject another SELECT */
+        int exec_dbid = server.also_propagate.ops[server.also_propagate.numops-1].dbid;
+        propagateNow(exec_dbid,&shared.exec,1,PROPAGATE_AOF|PROPAGATE_REPL);
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
     }
 
     redisOpArrayFree(&server.also_propagate);

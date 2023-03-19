@@ -1,8 +1,11 @@
 #include "redismodule.h"
+<<<<<<< HEAD
 #include <pthread.h>
 #include <assert.h>
 
 #define UNUSED(V) ((void) V)
+=======
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 
 RedisModuleUser *user = NULL;
 
@@ -107,6 +110,7 @@ int reset_user(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
     return REDISMODULE_OK;
 }
 
+<<<<<<< HEAD
 typedef struct {
     RedisModuleString **argv;
     int argc;
@@ -199,6 +203,8 @@ int call_with_user_bg(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     return REDISMODULE_OK;
 }
 
+=======
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
     REDISMODULE_NOT_USED(argv);
     REDISMODULE_NOT_USED(argc);
@@ -212,9 +218,12 @@ int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) 
     if (RedisModule_CreateCommand(ctx,"usercall.call_with_user_flag", call_with_user_flag,"write",0,0,0) == REDISMODULE_ERR)
         return REDISMODULE_ERR;
 
+<<<<<<< HEAD
     if (RedisModule_CreateCommand(ctx, "usercall.call_with_user_bg", call_with_user_bg, "write", 0, 0, 0) == REDISMODULE_ERR)
         return REDISMODULE_ERR;
 
+=======
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
     if (RedisModule_CreateCommand(ctx, "usercall.add_to_acl", add_to_acl, "write",0,0,0) == REDISMODULE_ERR)
         return REDISMODULE_ERR;
 

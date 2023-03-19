@@ -51,13 +51,21 @@
                 "name": "key",
                 "type": "key",
                 "key_spec_index": 0,
+<<<<<<< HEAD
                 "optional":true,
+=======
+		"optional":true,
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
                 "multiple": true
             },
             {
                 "name": "arg",
                 "type": "string",
+<<<<<<< HEAD
                 "optional":true,
+=======
+		"optional":true,
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
                 "multiple": true
             }
         ]

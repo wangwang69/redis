@@ -26,7 +26,11 @@ start_server {tags {"modules usercall"}} {
         assert_equal [r usercall.reset_user] OK
         assert_equal [r usercall.add_to_acl "~* &* +@all -set"] OK
         # off and sanitize-payload because module user / default value
+<<<<<<< HEAD
         assert_equal [r usercall.get_acl] "off sanitize-payload ~* &* +@all -set"
+=======
+        assert_equal [r usercall.get_acl] "off ~* &* +@all -set"
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 
         # doesn't fail for regular commands as just testing acl here
         assert_equal [r usercall.call_with_user_flag {} set x 10] OK
@@ -39,6 +43,7 @@ start_server {tags {"modules usercall"}} {
     test {test module check regular redis command with user and acl} {
         assert_equal [r set x 5] OK
 
+<<<<<<< HEAD
         r ACL LOG RESET
         assert_equal [r usercall.reset_user] OK
         assert_equal [r usercall.add_to_acl "~* &* +@all -set"] OK
@@ -82,6 +87,19 @@ start_server {tags {"modules usercall"}} {
         assert_equal [dict get $entry reason] {command}
         assert_match {*cmd=NULL*} [dict get $entry client-info]
 
+=======
+        assert_equal [r usercall.reset_user] OK
+        assert_equal [r usercall.add_to_acl "~* &* +@all -set"] OK
+        # off and sanitize-payload because module user / default value
+        assert_equal [r usercall.get_acl] "off ~* &* +@all -set"
+
+        # fails here as testing acl in rm call
+        catch {r usercall.call_with_user_flag C set x 10} e
+        assert_match {*ERR acl verification failed*} $e
+
+        assert_equal [r usercall.call_with_user_flag C get x] 5
+
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
         assert_equal [r usercall.reset_user] OK
     }
 
@@ -102,7 +120,11 @@ start_server {tags {"modules usercall"}} {
         assert_equal [r usercall.reset_user] OK
         assert_equal [r usercall.add_to_acl "~* &* +@all -set"] OK
         # off and sanitize-payload because module user / default value
+<<<<<<< HEAD
         assert_equal [r usercall.get_acl] "off sanitize-payload ~* &* +@all -set"
+=======
+        assert_equal [r usercall.get_acl] "off ~* &* +@all -set"
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 
         # passes as not checking ACL
         assert_equal [r usercall.call_with_user_flag {} evalsha $sha_set 0] 1
@@ -115,12 +137,16 @@ start_server {tags {"modules usercall"}} {
         set sha_set [r script load $test_script_set]
         set sha_get [r script load $test_script_get]
 
+<<<<<<< HEAD
         r ACL LOG RESET
+=======
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
         assert_equal [r usercall.reset_user] OK
         assert_equal [r usercall.add_to_acl "~* &* +@all -set"] OK
 
         # fails here in script, as rm_call will permit the eval call
         catch {r usercall.call_with_user_flag C evalsha $sha_set 0} e
+<<<<<<< HEAD
         assert_match {*ERR ACL failure in script*} $e
 
         assert_equal [r usercall.call_with_user_flag C evalsha $sha_get 0] 1
@@ -134,3 +160,10 @@ start_server {tags {"modules usercall"}} {
         assert_match {*cmd=usercall.call_with_user_flag*} [dict get $entry client-info]
     }
 }
+=======
+        assert_match {*ERR The user executing the script can't run this command or subcommand script*} $e
+
+        assert_equal [r usercall.call_with_user_flag C evalsha $sha_get 0] 1
+    }
+}
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140

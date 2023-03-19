@@ -171,6 +171,7 @@ int getTimeoutFromObjectOrReply(client *c, robj *object, mstime_t *timeout, int 
         if (getLongDoubleFromObjectOrReply(c,object,&ftval,
             "timeout is not a float or out of range") != C_OK)
             return C_ERR;
+<<<<<<< HEAD
 
         ftval *= 1000.0;  /* seconds => millisec */
         if (ftval > LLONG_MAX) {
@@ -178,6 +179,9 @@ int getTimeoutFromObjectOrReply(client *c, robj *object, mstime_t *timeout, int 
             return C_ERR;
         }
         tval = (long long) ceill(ftval);
+=======
+        tval = (long long) ceill(ftval * 1000.0);
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
     } else {
         if (getLongLongFromObjectOrReply(c,object,&tval,
             "timeout is not an integer or out of range") != C_OK)

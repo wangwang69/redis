@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 proc get_links_with_peer {this_instance_id peer_nodename} {
     set links [R $this_instance_id cluster links]
     set links_with_peer {}
@@ -52,6 +53,8 @@ proc reset_links {id} {
         fail "Cluster links did not come back up"
     }
 }
+=======
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 
 proc number_of_peers {id} {
     expr [llength $::servers] - 1
@@ -122,6 +125,7 @@ start_cluster 1 2 {tags {external:skip cluster}} {
     } {} {needs:debug}
 }
 
+<<<<<<< HEAD
 start_cluster 3 0 {tags {external:skip cluster}} {
     test "Each node has two links with each peer" {
         for {set id 0} {$id < [llength $::servers]} {incr id} {
@@ -290,3 +294,5 @@ start_cluster 3 0 {tags {external:skip cluster}} {
         }
     }
 }
+=======
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140

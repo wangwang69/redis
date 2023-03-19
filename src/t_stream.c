@@ -3394,12 +3394,16 @@ void xautoclaimCommand(client *c) {
     }
 
     /* Do the actual claiming. */
+<<<<<<< HEAD
     streamConsumer *consumer = streamLookupConsumer(group,c->argv[3]->ptr);
     if (consumer == NULL) {
         consumer = streamCreateConsumer(group,c->argv[3]->ptr,c->argv[1],c->db->id,SCC_DEFAULT);
     }
     consumer->seen_time = commandTimeSnapshot();
 
+=======
+    streamConsumer *consumer = NULL;
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
     long long attempts = count * attempts_factor;
 
     addReplyArrayLen(c, 3); /* We add another reply later */
@@ -3412,7 +3416,12 @@ void xautoclaimCommand(client *c) {
     raxStart(&ri,group->pel);
     raxSeek(&ri,">=",startkey,sizeof(startkey));
     size_t arraylen = 0;
+<<<<<<< HEAD
     mstime_t now = commandTimeSnapshot();
+=======
+    mstime_t now = mstime();
+    sds name = c->argv[3]->ptr;
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
     int deleted_id_num = 0;
     while (attempts-- && count && raxNext(&ri)) {
         streamNACK *nack = ri.data;

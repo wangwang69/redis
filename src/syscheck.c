@@ -154,7 +154,11 @@ int checkOvercommit(sds *error_msg) {
         *error_msg = sdsnew(
             "Memory overcommit must be enabled! Without it, a background save or replication may fail under low memory condition. "
 #if defined(USE_JEMALLOC)
+<<<<<<< HEAD
             "Being disabled, it can also cause failures without low memory condition, see https://github.com/jemalloc/jemalloc/issues/1328. "
+=======
+            "Being disabled, it can can also cause failures without low memory condition, see https://github.com/jemalloc/jemalloc/issues/1328. "
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 #endif
             "To fix this issue add 'vm.overcommit_memory = 1' to /etc/sysctl.conf and then reboot or run the "
             "command 'sysctl vm.overcommit_memory=1' for this to take effect.");

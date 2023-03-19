@@ -68,7 +68,11 @@ start_server {tags {"scripting"}} {
     } {}
 
     test {EVAL - Return table with a metatable that call redis} {
+<<<<<<< HEAD
         run_script {local a = {}; setmetatable(a,{__index=function() redis.call('set', 'x', '1') end}) return a} 1 x
+=======
+        run_script {local a = {}; setmetatable(a,{__index=function() redis.call('set', 'x', '1') end}) return a} 0
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
         # make sure x was not set
         r get x
     } {}

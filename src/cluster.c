@@ -1092,7 +1092,11 @@ void setClusterNodeToInboundClusterLink(clusterNode *node, clusterLink *link) {
          * one inbound link from the same node at the same time. Our cleanup logic assumes
          * a one to one relationship between nodes and inbound links, so we need to kill
          * one of the links. The existing link is more likely the outdated one, but it's
+<<<<<<< HEAD
          * possible the other node may need to open another link. */
+=======
+         * possible the the other node may need to open another link. */
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
         serverLog(LL_DEBUG, "Replacing inbound link fd %d from node %.40s with fd %d",
                 node->inbound_link->conn->fd, node->name, link->conn->fd);
         freeClusterLink(node->inbound_link);
@@ -2069,7 +2073,11 @@ int nodeIp2String(char *buf, clusterLink *link, char *announced_ip) {
         buf[NET_IP_STR_LEN-1] = '\0'; /* We are not sure the input is sane. */
         return C_OK;
     } else {
+<<<<<<< HEAD
         if (connAddrPeerName(link->conn, buf, NET_IP_STR_LEN, NULL) == -1) {
+=======
+        if (connPeerToString(link->conn, buf, NET_IP_STR_LEN, NULL) == C_ERR) {
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
             serverLog(LL_NOTICE, "Error converting peer IP to string: %s",
                 link->conn ? connGetLastError(link->conn) : "no link");
             return C_ERR;
@@ -3203,11 +3211,19 @@ void clusterReadHandler(connection *conn) {
  * It is guaranteed that this function will never have as a side effect
  * the link to be invalidated, so it is safe to call this function
  * from event handlers that will do stuff with the same link later. */
+<<<<<<< HEAD
 void clusterSendMessage(clusterLink *link, clusterMsgSendBlock *msgblock) {
     if (!link) {
         return;
     }
     if (listLength(link->send_msg_queue) == 0 && msgblock->msg.totlen != 0)
+=======
+void clusterSendMessage(clusterLink *link, unsigned char *msg, size_t msglen) {
+    if (!link) {
+        return;
+    }
+    if (sdslen(link->sndbuf) == 0 && msglen != 0)
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
         connSetWriteHandlerWithBarrier(link->conn, clusterWriteHandler, 1);
 
     listAddNodeTail(link->send_msg_queue, msgblock);
@@ -3498,9 +3514,22 @@ void clusterBroadcastPong(int target) {
  * the 'bulk_data', sanitizer generates an out-of-bounds error which is a false
  * positive in this context. */
 REDIS_NO_SANITIZE("bounds")
+<<<<<<< HEAD
 clusterMsgSendBlock *clusterCreatePublishMsgBlock(robj *channel, robj *message, uint16_t type) {
 
+=======
+void clusterSendPublish(clusterLink *link, robj *channel, robj *message, uint16_t type, int bcast) {
+    unsigned char *payload;
+    clusterMsg buf[1];
+    clusterMsg *hdr = (clusterMsg*) buf;
+    uint32_t totlen;
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
     uint32_t channel_len, message_len;
+
+    /* In case we are not going to broadcast we have no point trying to publish on a missing
+     * clusterbus link. */
+    if (!bcast && !link)
+        return;
 
     channel = getDecodedObject(channel);
     message = getDecodedObject(message);
@@ -3518,6 +3547,14 @@ clusterMsgSendBlock *clusterCreatePublishMsgBlock(robj *channel, robj *message, 
     memcpy(hdr->data.publish.msg.bulk_data+sdslen(channel->ptr),
         message->ptr,sdslen(message->ptr));
 
+<<<<<<< HEAD
+=======
+    if (!bcast)
+        clusterSendMessage(link,payload,totlen);
+    else
+        clusterBroadcastMessage(payload,totlen);
+
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
     decrRefCount(channel);
     decrRefCount(message);
     
@@ -3616,6 +3653,7 @@ void clusterPropagatePublish(robj *channel, robj *message, int sharded) {
     clusterMsgSendBlock *msgblock;
 
     if (!sharded) {
+<<<<<<< HEAD
         msgblock = clusterCreatePublishMsgBlock(channel, message, CLUSTERMSG_TYPE_PUBLISH);
         clusterBroadcastMessage(msgblock);
         clusterMsgSendBlockDecrRefCount(msgblock);
@@ -3633,6 +3671,23 @@ void clusterPropagatePublish(robj *channel, robj *message, int sharded) {
         if (node->flags & (CLUSTER_NODE_MYSELF|CLUSTER_NODE_HANDSHAKE))
             continue;
         clusterSendMessage(node->link,msgblock);
+=======
+        clusterSendPublish(NULL, channel, message, CLUSTERMSG_TYPE_PUBLISH, 1);
+        return;
+    }
+
+    list *nodes_for_slot = clusterGetNodesServingMySlots(server.cluster->myself);
+    if (listLength(nodes_for_slot) != 0) {
+        listIter li;
+        listNode *ln;
+        listRewind(nodes_for_slot, &li);
+        while((ln = listNext(&li))) {
+            clusterNode *node = listNodeValue(ln);
+            if (node->flags & (CLUSTER_NODE_MYSELF|CLUSTER_NODE_HANDSHAKE))
+                continue;
+            clusterSendPublish(node->link, channel, message, CLUSTERMSG_TYPE_PUBLISHSHARD, 0);
+        }
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
     }
     clusterMsgSendBlockDecrRefCount(msgblock);
 }
@@ -4337,6 +4392,24 @@ static int clusterNodeCronHandleReconnect(clusterNode *node, mstime_t handshake_
     return 0;
 }
 
+<<<<<<< HEAD
+=======
+static void resizeClusterLinkBuffer(clusterLink *link) {
+     /* If unused space is a lot bigger than the used portion of the buffer then free up unused space.
+      * We use a factor of 4 because of the greediness of sdsMakeRoomFor (used by sdscatlen). */
+    if (link != NULL && sdsavail(link->sndbuf) / 4 > sdslen(link->sndbuf)) {
+        link->sndbuf = sdsRemoveFreeSpace(link->sndbuf, 1);
+    }
+}
+
+/* Resize the send buffer of a node if it is wasting
+ * enough space. */
+static void clusterNodeCronResizeBuffers(clusterNode *node) {
+    resizeClusterLinkBuffer(node->link);
+    resizeClusterLinkBuffer(node->inbound_link);
+}
+
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 static void freeClusterLinkOnBufferLimitReached(clusterLink *link) {
     if (link == NULL || server.cluster_link_msg_queue_limit_bytes == 0) {
         return;
@@ -7274,7 +7347,11 @@ int clusterRedirectBlockedClientIfNeeded(client *c) {
 
         /* If the client is blocked on module, but not on a specific key,
          * don't unblock it (except for the CLUSTER_FAIL case above). */
+<<<<<<< HEAD
         if (c->bstate.btype == BLOCKED_MODULE && !moduleClientIsBlockedOnKeys(c))
+=======
+        if (c->btype == BLOCKED_MODULE && !moduleClientIsBlockedOnKeys(c))
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
             return 0;
 
         /* All keys must belong to the same slot, so check first key only. */

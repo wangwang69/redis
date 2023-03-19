@@ -150,9 +150,18 @@ void connTypeCleanupAll() {
         if (!ct)
             break;
 
+<<<<<<< HEAD
         if (ct->cleanup)
             ct->cleanup();
     }
+=======
+int connPeerToString(connection *conn, char *ip, size_t ip_len, int *port) {
+    if (anetFdToString(conn ? conn->fd : -1, ip, ip_len, port, FD_TO_PEER_NAME) == -1) {
+        if (conn) conn->last_errno = errno;
+        return C_ERR;
+    }
+    return C_OK;
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 }
 
 /* walk all the connection types until has pending data */

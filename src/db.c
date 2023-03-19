@@ -1691,7 +1691,10 @@ int keyIsExpired(redisDb *db, robj *key) {
  * The return value of the function is 0 if the key is still valid,
  * otherwise the function returns 1 if the key is expired. */
 int expireIfNeeded(redisDb *db, robj *key, int flags) {
+<<<<<<< HEAD
     if (server.lazy_expire_disabled) return 0;
+=======
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
     if (!keyIsExpired(db,key)) return 0;
 
     /* If we are running in the context of a replica, instead of
@@ -1708,7 +1711,11 @@ int expireIfNeeded(redisDb *db, robj *key, int flags) {
      * When replicating commands from the master, keys are never considered
      * expired. */
     if (server.masterhost != NULL) {
+<<<<<<< HEAD
         if (server.current_client && (server.current_client->flags & CLIENT_MASTER)) return 0;
+=======
+        if (server.current_client == server.master) return 0;
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
         if (!(flags & EXPIRE_FORCE_DELETE_EXPIRED)) return 1;
     }
 
@@ -1717,10 +1724,18 @@ int expireIfNeeded(redisDb *db, robj *key, int flags) {
     if (flags & EXPIRE_AVOID_DELETE_EXPIRED)
         return 1;
 
+<<<<<<< HEAD
     /* If 'expire' action is paused, for whatever reason, then don't expire any key.
      * Typically, at the end of the pause we will properly expire the key OR we
      * will have failed over and the new primary will send us the expire. */
     if (isPausedActionsWithUpdate(PAUSE_ACTION_EXPIRE)) return 1;
+=======
+    /* If clients are paused, we keep the current dataset constant,
+     * but return to the client what we believe is the right state. Typically,
+     * at the end of the pause we will properly expire the key OR we will
+     * have failed over and the new primary will send us the expire. */
+    if (checkClientPauseTimeoutAndReturnIfPaused()) return 1;
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
 
     /* Delete the key */
     deleteExpiredKeyAndPropagate(db,key);

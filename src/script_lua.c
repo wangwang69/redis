@@ -981,7 +981,11 @@ cleanup:
     c->argc = c->argv_len = 0;
     c->user = NULL;
     c->argv = NULL;
+<<<<<<< HEAD
     resetClient(c);
+=======
+    freeClientArgv(c);
+>>>>>>> 86920532f72ff005fcb146c5a02562f9a10b8140
     inuse--;
 
     if (raise_error) {
